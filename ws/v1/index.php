@@ -2,6 +2,7 @@
 
 require_once '../include/DbHandler.php';
 require_once '../include/PassHash.php';
+require_once '../include/CommonConstants.php';
 require '.././libs/Slim/Slim.php';
 
 \Slim\Slim::registerAutoloader();
@@ -105,12 +106,49 @@ $app->get('/displayitems', function() use ($app) {
                 $tmp["item_id"] = $items["item_id"];
                 $tmp["item_name"] = $items["item_name"];
 				$tmp["item_type"] = $items["item_type"];
+				$tmp["quantity"] = $items['quantity'];
+				$tmp["retail_rate"] = $items['retail_rate'];
                 array_push($response["items"], $tmp);
             }
             
             echoRespnse(200, $response);
         });
 
+		
+/**
+ * Display Items
+ * url - /getitemsbyname
+ * method - POST
+ * params - item_name
+ */
+$app->post('/getitemsbyname', function() use ($app) {
+	
+	verifyRequiredParams(array('item_name_str'));
+            
+            $response = array();
+            $db = new DbHandler();
+			
+			$item_name_str = $app->request->post('item_name_str');
+			
+            // fetch items
+            $result = $db->getItemsByName($item_name_str);
+
+            $response["error"] = false;
+            $response["items"] = array();
+
+            // looping through result and preparing orders array
+            while ($items = $result->fetch_assoc()) {
+                $tmp = array();
+                $tmp["item_id"] = $items["item_id"];
+                $tmp["item_name"] = $items["item_name"];
+				$tmp["item_type"] = $items["item_type"];
+				$tmp["quantity"] = $items['quantity'];
+				$tmp["retail_rate"] = $items['retail_rate'];
+                array_push($response["items"], $tmp);
+            }
+            
+            echoRespnse(200, $response);
+        });
 
 
 
@@ -145,7 +183,35 @@ function verifyRequiredParams($required_fields) {
         $app->stop();
     }
 }
+/**
+*Adding Stock in database
+**/
+$app->post('/interstock', function() use ($app) {
+            // check for required params
+            verifyRequiredParams(array('item_id', 'order_number', 'date_purchase', 'quantity', 'purchase_price', 'retail_price'));
+            $response = array();
+            //reading post params
+            $itemId = $app->request->post('item_id');
+            $orderNumber = $app->request->post('order_number');
+            $datePurchase = $app->request->post('date_purchase');
+            $quantity = $app->request->post('quantity');
+            $purchasePrice = $app->request->post('purchase_price');
+            $retailPrice = $app->request->post('retail_price');
+           
+            $db = new DbHandler();
+            $res = $db->addStock($itemId, $orderNumber, $datePurchase, $quantity, $purchasePrice, $retailPrice);
 
+            if ($res == STOCK_ADDED_SUCCESSFULLY) {
+                $response["error"] = false;
+                $response["message"] = "Stock Added Successfully";
+            } else if ($res == STOCK_ADDED_FAILED) {
+                $response["error"] = true;
+                $response["message"] = "Oops! failed..! Fail to add stock";
+            } 
+            // echo json response
+            echoRespnse(201, $response);
+        });
+	
 
 
 /**
